@@ -24,7 +24,12 @@
     "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [
-    "homebridge-plugin"
+    "homebridge",
+    "homebridge-plugin",
+    "casatunes",
+    "homekit",
+    "music",
+    "whole home audio"
   ],
   "dependencies": {
     "cross-fetch": "^3.0.6"

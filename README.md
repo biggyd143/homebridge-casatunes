@@ -35,7 +35,7 @@ Below is a sample entry from the Homebridge `config.json` file.
 ]
 ```
 
-The URI value can be found by navigating to the below loctions in your browser:
+The URI value can be found by navigating to the below locations in your browser:
 
 * PC: `http://casaserver/casadev`
 * MAC: `http://casaserver.local/casadev`
