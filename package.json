@@ -1,16 +1,16 @@
 {
-  "private": true,
+  "private": false,
   "displayName": "Homebridge CasaTunes",
   "name": "homebridge-casatunes",
   "version": "1.0.0",
-  "description": "Interface to the CasaTunes music system.",
+  "description": "Homebridge interface to the CasaTunes music system.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "git://github.com/biggyd143/homebridge-casatunes.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://https://github.com/biggyd143/homebridge-casatunes/issues"
   },
   "engines": {
     "node": ">=10.17.0",
