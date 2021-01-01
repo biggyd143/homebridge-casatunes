@@ -5,13 +5,6 @@
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
-        "description": "Plugin name as displayed in the homebridge log.",
-        "type": "string",
-        "required": true,
-        "default": "CasaTunes"
-      },
       "uri": {
         "title": "URI",
         "description": "URI for CasaTunes REST API (http://casaserver:8735/api/v1)",
