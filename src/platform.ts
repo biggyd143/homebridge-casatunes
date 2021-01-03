@@ -5,9 +5,11 @@ import { CasaTunesPlatformAccessory } from './platformAccessory';
 import { fetch } from 'cross-fetch';
 
 // Interface definition for the zone information.
-interface zoneInfo {
+export interface zoneInfo {
   Name: string;
-  ID: string;
+  ZoneId: string;
+  PersistentZoneId: string;
+  UUID: string;
 }
 
 /**
@@ -40,7 +42,7 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
     public readonly config: PlatformConfig,
     public readonly api: API,
   ) {
-    this.log.debug('Finished initializing platform:', this.config.platform);
+    this.log.debug('CasaTunesHomebridgePlatform: Finished initializing platform:', this.config.platform);
 
     // Store the URI string from the config.
     this.casaTunesUri = String(this.config.uri);
@@ -50,7 +52,7 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
     this.api.on('didFinishLaunching', async () => {
-      log.debug('Executed didFinishLaunching callback');
+      log.debug('CasaTunesHomebridgePlatform: Executed didFinishLaunching callback');
       // Call the method to get the platform information (manufacturer, model, etc.).
       await this.fetchPlatformInfo();
       // run the method to discover / register your devices as accessories
@@ -63,7 +65,7 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
    * It should be used to setup event handlers for characteristics and update respective values.
    */
   configureAccessory(accessory: PlatformAccessory) {
-    this.log.info('Loading accessory from cache:', accessory.displayName);
+    this.log.info('CasaTunesHomebridgePlatform:configureAccessory(): Loading accessory from cache:', accessory.displayName);
 
     // add the restored accessory to the accessories cache so we can track if it has already been registered
     this.accessories.push(accessory);
@@ -84,12 +86,26 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
   }
 
   /**
+   * This method returns the zones array.
+   */
+  getZonesArray() {
+    return this.zonesArray;
+  }
+
+  /**
+   * This method returns the accessories.
+   */
+  getAccessories() {
+    return this.accessories;
+  }
+
+  /**
    * This method fetches the platform information from CasaTunes.
    */
   fetchPlatformInfo = async () => {
     // Throw an error if the URI isn't defined in the config.
     if (this.casaTunesUri.match('undefined')) {
-      this.log.error('URI for CasaTunes API is not defined in the config');
+      this.log.error('CasaTunesHomebridgePlatform:fetchPlatformInfo(): URI for CasaTunes API is not defined in the config');
     } else {
       // The URI for CasaTunes REST API to fetch the platform info.
       const uri = this.casaTunesUri + '/system/info';
@@ -114,7 +130,7 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
       }
 
       this.log.debug(
-        'Manufacturer = ' + this.platformInfo.Manufacturer +
+        'CasaTunesHomebridgePlatform:fetchPlatformInfo(): Manufacturer = ' + this.platformInfo.Manufacturer +
         ', Model = ' + this.platformInfo.Model +
         ', Software Revision = ' + this.platformInfo.SoftwareRevision);
     }
@@ -126,7 +142,7 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
   fetchZones = async () => {
     // Throw an error if the URI isn't defined in the config.
     if (this.casaTunesUri.match('undefined')) {
-      this.log.error('URI for CasaTunes API is not defined in the config');
+      this.log.error('CasaTunesHomebridgePlatform:fetchZones(): URI for CasaTunes API is not defined in the config');
     } else {
       // The URI for CasaTunes REST API to fetch the zones.
       const uri = this.casaTunesUri + '/zones';
@@ -144,10 +160,13 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
       for (let i=0; i<zones.length; i++) {
         // Leave out the AirPlay devices which have a @ symbol in the persistent zone ID.
         if (!zones[i].PersistentZoneID.includes('@')) {
-          this.log.debug('Found Zone: name = ' + zones[i].Name + ', id = ' + zones[i].PersistentZoneID);
+          this.log.debug(
+            'CasaTunesHomebridgePlatform:fetchZones(): Found Zone: name = ' + zones[i].Name +
+            ', id = ' + zones[i].ZoneID +
+            ', persistent id = ' + zones[i].PersistentZoneID);
 
           // Initialize a zoneInfo variable.
-          const temp = {Name: zones[i].Name, ID: zones[i].PersistentZoneID} as zoneInfo;
+          const temp = {Name: zones[i].Name, ZoneId: zones[i].ZoneID, PersistentZoneId: zones[i].PersistentZoneID, UUID: ''} as zoneInfo;
 
           // Store the zoneInfo variable in the public array.
           this.zonesArray[count] = temp;
@@ -172,7 +191,10 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
       // generate a unique id for the accessory this should be generated from
       // something globally unique, but constant, for example, the device serial
       // number or MAC address
-      const uuid = this.api.hap.uuid.generate(zone.ID);
+      const uuid = this.api.hap.uuid.generate(zone.PersistentZoneId);
+
+      // Store the UUID in the zone info.
+      zone.UUID = uuid;
 
       // see if an accessory with the same uuid has already been registered and restored from
       // the cached devices we stored in the `configureAccessory` method above
@@ -180,7 +202,8 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
 
       if (existingAccessory) {
         // the accessory already exists
-        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+        this.log.info(
+          'CasaTunesHomebridgePlatform:discoverDevices(): Restoring existing accessory from cache:', existingAccessory.displayName);
 
         // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
         // existingAccessory.context.device = device;
@@ -190,14 +213,14 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
         // this is imported from `platformAccessory.ts`
         const casatunesAccessory = new CasaTunesPlatformAccessory(this, existingAccessory);
 
-        // Store the zone ID for CasaTunes API calls.
-        casatunesAccessory.setZoneId(zone.ID);
+        // Store the persistent zone ID for CasaTunes API calls.
+        casatunesAccessory.setPersistentZoneId(zone.PersistentZoneId);
         
         // update accessory cache with any changes to the accessory details and information
         this.api.updatePlatformAccessories([existingAccessory]);
       } else {
         // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', zone.Name);
+        this.log.info('CasaTunesHomebridgePlatform:discoverDevices(): Adding new accessory:', zone.Name);
 
         // create a new accessory
         const accessory = new this.api.platformAccessory(zone.Name, uuid);
@@ -218,13 +241,13 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
     // Loop over the accessories cache and unregister the ones that have not been discovered.
     for (const accessory of this.accessories) {
       // See if any of the discovered device's uuid match the accessory's uuid.
-      const existingDevice = this.zonesArray.find(zone => this.api.hap.uuid.generate(zone.ID) === accessory.UUID);
+      const existingDevice = this.zonesArray.find(zone => this.api.hap.uuid.generate(zone.PersistentZoneId) === accessory.UUID);
 
       if (!existingDevice) {
         // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
         // remove platform accessories when no longer present
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-        this.log.info('Removing existing accessory from cache:', accessory.displayName);
+        this.log.info('CasaTunesHomebridgePlatform:discoverDevices(): Removing existing accessory from cache:', accessory.displayName);
       }
     }
   };

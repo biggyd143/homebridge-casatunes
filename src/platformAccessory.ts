@@ -1,6 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue, CharacteristicSetCallback, CharacteristicGetCallback } from 'homebridge';
 
 import { CasaTunesHomebridgePlatform } from './platform';
+import { zoneInfo } from './platform';
 import { fetch } from 'cross-fetch';
 
 /**
@@ -12,7 +13,7 @@ export class CasaTunesPlatformAccessory {
   private service: Service;
 
   // The specific CasaTunes zond ID for the accessory.
-  private zoneId = '';
+  private persistentZoneId = '';
 
   constructor(
     private readonly platform: CasaTunesHomebridgePlatform,
@@ -54,11 +55,12 @@ export class CasaTunesPlatformAccessory {
   /**
    * This method stores the accessory's zone ID for CasaTunes API calls.
    */
-  setZoneId(id: string) {
+  setPersistentZoneId(id: string) {
     // Store the zone ID.
-    this.zoneId = id;
+    this.persistentZoneId = id;
 
-    this.platform.log.debug('Set ' + this.accessory.displayName + ' zone ID ->', this.zoneId);
+    this.platform.log.debug(
+      'CasaTunesPlatformAccessory:setPersistentZoneId(): Set ' + this.accessory.displayName + ' zone ID ->', this.persistentZoneId);
   }
 
   /**
@@ -68,15 +70,41 @@ export class CasaTunesPlatformAccessory {
   setOn = async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
     // Throw an error if the URI isn't defined in the config.
     if (this.platform.getCasaTunesURI().match('undefined')) {
-      this.platform.log.error('URI for CasaTunes API is not defined in the config');
+      this.platform.log.error('CasaTunesPlatformAccessory:setOn(): URI for CasaTunes API is not defined in the config');
     } else {
       // The URI for CasaTunes REST API to fetch the zone info.
-      const uri = this.platform.getCasaTunesURI() + '/zones/' + this.zoneId + '?Power=' + value;
+      const uri = this.platform.getCasaTunesURI() + '/zones/' + this.persistentZoneId + '?Power=' + value;
       
       // Wait for the response.
-      await fetch(uri);
+      const response = await fetch(uri);
 
-      this.platform.log.debug('Set ' + this.accessory.displayName + ' Characteristic On ->', value);
+      // Wait for the JSON.
+      const zone = await response.json();
+
+      // Check to see if this zone is a group zone.
+      if(String(zone.Shared).match('true')) {
+        // Iterate through the group to set the 'On' value.
+        for(let i=0; i<zone.ZoneGroupInfo.length; i++) {
+          // Fetch the cached zones array from the platform.
+          const zonesArray = this.platform.getZonesArray();
+
+          // Find the zoneInfo that matches the zone's ID.
+          const info = zonesArray.find(zoneInfo => zoneInfo.ZoneId === zone.ZoneGroupInfo[i].zoneId) as zoneInfo;
+
+          // Fetch the cached accessories from the platform.
+          const accessories = this.platform.getAccessories();
+
+          // Find the accessory that matches the zone's UUID.
+          const accessory = accessories.find(acc => acc.UUID === info.UUID) as PlatformAccessory;
+
+          // Set the accessory's 'On' value.
+          accessory?.getService(this.platform.Service.Lightbulb)?.setCharacteristic(this.platform.Characteristic.On, value);
+
+          this.platform.log.debug('CasaTunesPlatformAccessory:setOn(): Set ' + accessory.displayName + ' Characteristic On ->', value);
+        }
+      }
+
+      this.platform.log.debug('CasaTunesPlatformAccessory:setOn(): Set ' + this.accessory.displayName + ' Characteristic On ->', value);
 
       // you must call the callback function
       callback(null);
@@ -99,10 +127,10 @@ export class CasaTunesPlatformAccessory {
   getOn = async (callback: CharacteristicGetCallback) => {
     // Throw an error if the URI isn't defined in the config.
     if (this.platform.getCasaTunesURI().match('undefined')) {
-      this.platform.log.error('URI for CasaTunes API is not defined in the config');
+      this.platform.log.error('CasaTunesPlatformAccessory:getOn(): URI for CasaTunes API is not defined in the config');
     } else {
       // The URI for CasaTunes REST API to fetch the zone info.
-      const uri = this.platform.getCasaTunesURI() + '/zones/' + this.zoneId;
+      const uri = this.platform.getCasaTunesURI() + '/zones/' + this.persistentZoneId;
       
       // Wait for the response.
       const response = await fetch(uri);
@@ -113,7 +141,7 @@ export class CasaTunesPlatformAccessory {
       // Fetch the Power property.
       const isOn = info.Power;
 
-      this.platform.log.debug('Get ' + this.accessory.displayName + ' Characteristic On ->', isOn);
+      this.platform.log.debug('CasaTunesPlatformAccessory:getOn(): Get ' + this.accessory.displayName + ' Characteristic On ->', isOn);
 
       // you must call the callback function
       // the first argument should be null if there were no errors
@@ -129,15 +157,43 @@ export class CasaTunesPlatformAccessory {
   setVolume = async (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
     // Throw an error if the URI isn't defined in the config.
     if (this.platform.getCasaTunesURI().match('undefined')) {
-      this.platform.log.error('URI for CasaTunes API is not defined in the config');
+      this.platform.log.error('CasaTunesPlatformAccessory:setVolume(): URI for CasaTunes API is not defined in the config');
     } else {
       // The URI for CasaTunes REST API to fetch the zone info.
-      const uri = this.platform.getCasaTunesURI() + '/zones/' + this.zoneId + '?Volume=' + value;
+      const uri = this.platform.getCasaTunesURI() + '/zones/' + this.persistentZoneId + '?Volume=' + value;
       
       // Wait for the response.
-      await fetch(uri);
+      const response = await fetch(uri);
 
-      this.platform.log.debug('Set ' + this.accessory.displayName + ' Characteristic Volume ->', value);
+      // Wait for the JSON.
+      const zone = await response.json();
+
+      // Check to see if this zone is a group zone.
+      if(String(zone.Shared).match('true')) {
+        // Iterate through the group to set the 'Brightness' (volume) value.
+        for(let i=0; i<zone.ZoneGroupInfo.length; i++) {
+          // Fetch the cached zones array from the platform.
+          const zonesArray = this.platform.getZonesArray();
+
+          // Find the zoneInfo that matches the zone's ID.
+          const info = zonesArray.find(zoneInfo => zoneInfo.ZoneId === zone.ZoneGroupInfo[i].zoneId) as zoneInfo;
+
+          // Fetch the cached accessories from the platform.
+          const accessories = this.platform.getAccessories();
+
+          // Find the accessory that matches the zone's UUID.
+          const accessory = accessories.find(acc => acc.UUID === info.UUID) as PlatformAccessory;
+
+          // Set the accessory's 'Brightness' (volume) value.
+          accessory?.getService(this.platform.Service.Lightbulb)?.setCharacteristic(this.platform.Characteristic.Brightness, value);
+
+          this.platform.log.debug(
+            'CasaTunesPlatformAccessory:setVolume(): Set ' + accessory.displayName + ' Characteristic Volume ->', value);
+        }
+      }
+
+      this.platform.log.debug(
+        'CasaTunesPlatformAccessory:setVolume(): Set ' + this.accessory.displayName + ' Characteristic Volume ->', value);
 
       // you must call the callback function
       callback(null);
@@ -151,10 +207,10 @@ export class CasaTunesPlatformAccessory {
   getVolume = async (callback: CharacteristicGetCallback) => {
     // Throw an error if the URI isn't defined in the config.
     if (this.platform.getCasaTunesURI().match('undefined')) {
-      this.platform.log.error('URI for CasaTunes API is not defined in the config');
+      this.platform.log.error('CasaTunesPlatformAccessory:getVolume(): URI for CasaTunes API is not defined in the config');
     } else {
       // The URI for CasaTunes REST API to fetch the zone info.
-      const uri = this.platform.getCasaTunesURI() + '/zones/' + this.zoneId;
+      const uri = this.platform.getCasaTunesURI() + '/zones/' + this.persistentZoneId;
       
       // Wait for the response.
       const response = await fetch(uri);
@@ -165,7 +221,8 @@ export class CasaTunesPlatformAccessory {
       // Fetch the Volume property.
       const volume = info.Volume;
 
-      this.platform.log.debug('Get ' + this.accessory.displayName + ' Characteristic Volume ->', volume);
+      this.platform.log.debug(
+        'CasaTunesPlatformAccessory:getVolume(): Get ' + this.accessory.displayName + ' Characteristic Volume ->', volume);
 
       // you must call the callback function
       callback(null, volume);
