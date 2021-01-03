@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.0.2
+### Housekeeping
+* Updated the release notes.
+
 ## v1.0.1
 ### Bug Fixes
 * Fixed issue where individual zones do not reflect the most updated status when a zone group is updated.
