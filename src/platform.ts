@@ -231,7 +231,10 @@ export class CasaTunesHomebridgePlatform implements DynamicPlatformPlugin {
 
         // create the accessory handler for the newly create accessory
         // this is imported from `platformAccessory.ts`
-        new CasaTunesPlatformAccessory(this, accessory);
+        const casatunesAccessory = new CasaTunesPlatformAccessory(this, accessory);
+
+        // Store the persistent zone ID for CasaTunes API calls.
+        casatunesAccessory.setPersistentZoneId(zone.PersistentZoneId);
 
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
